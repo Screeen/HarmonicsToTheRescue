@@ -13,8 +13,6 @@ import os
 from matplotlib import pyplot as plt, ticker
 from scipy.ndimage import uniform_filter1d
 
-import utils
-
 # 1413028339 looks fine
 rnd_seed = int(np.random.rand() * (2**32 - 1))
 rnd_seed = 866369434
@@ -319,6 +317,9 @@ def normalize_volume(x_samples, max_value=0.9):
 def check_create_folder(folder_name, parent_folder=None):
     if parent_folder is None:
         parent_folder = os.getcwd()
+    else:
+        if not parent_folder.exists():
+            parent_folder.mkdir(parents=True)
     child_folder = os.path.join(parent_folder, folder_name)
     if not os.path.exists(child_folder):
         os.mkdir(child_folder)

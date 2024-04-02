@@ -1,5 +1,4 @@
-import copy
-import sys
+import warnings
 from pathlib import PosixPath, Path
 import numpy as np
 import scipy
@@ -28,13 +27,15 @@ R_shift_samples = Nw // 3
 snr = np.inf
 num_realizations = 100
 
-# y_real_f0_est = SysMan.load_vowel_recording(N_num_samples=N, fs_=fs, offset_=0, selected_people=['1'], smoothing_window=False)
-# _, f0_est, _, _ = sys_identifier_manager.SysIdentifierManager.find_f0_from_recording(y_real_f0_est, fs,
-#                                                                                      R_shift_samples * 4, Nw * 4)
-# y_real = SysMan.load_vowel_recording(N_num_samples=N, fs_=fs, offset_=0.06, selected_people=['1'], smoothing_window=False)
+module_parent = Path(__file__).resolve().parent
+dataset_path_parent = module_parent.parent / 'datasets' / 'north_texas_vowels' / 'data'
+file_name = 'kadpal03.wav'
+if dataset_path_parent.exists():
+    pp = dataset_path_parent / file_name
+else:
+    warnings.warn(f"Path {dataset_path_parent} does not exist. Use sample file.")
+    pp = module_parent / 'audio' / file_name
 
-# Load real signal and estimate f0. The estimated f0 is used to generate the synthetic signals.
-pp = PosixPath('/Users/giovannibologni/Documents/TU Delft/Code-parent/datasets/north_texas_vowels/data/kadpal03.wav')
 y_real = u.load_audio_file(pp, fs_=fs, offset_seconds=0.045, N_num_samples=N, smoothing_window=False)
 f0_stats, _ = manager.Manager.find_f0_from_recording(y_real, fs, 512, 2048)
 f0 = np.round(f0_stats[1])

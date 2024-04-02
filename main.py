@@ -2,7 +2,6 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-from icecream import ic
 from matplotlib import pyplot as plt
 from tqdm import trange
 from tqdm.contrib import tenumerate
@@ -13,14 +12,6 @@ import manager as si_manager
 import system_identifier as si
 import utils as u
 
-ic.configureOutput(prefix='')
-if u.is_debug_mode():
-    # ic does not work, so replace it with
-    def ic(*args):
-        # Print each argument with variable name using f-strings
-        for idx, arg in enumerate(args):
-            print(f"{idx}: {arg}")
-        print()
 
 u.set_printoptions_numpy()
 u.set_plot_options(use_tex=True)
@@ -71,7 +62,7 @@ nfft_default = 256
 snr_db_default = 0
 N_num_samples_default = int(0.25 * fs)
 
-num_montecarlo = 40
+num_montecarlo = 1
 
 compute_coherence = True
 filtered_noise = False
@@ -147,7 +138,7 @@ for variation_name in variation_names:
         assert N_num_samples >= nw, f"Signal length {N_num_samples} is shorter than one frame {nw}"
 
         dft_properties = {'nfft': nfft, 'nw': nw, 'fs': fs, 'noverlap': noverlap}
-        ic(dft_properties['nfft'], dft_properties['nw'])
+        print(f"{dft_properties['nfft'] = }, {dft_properties['nw'] = }")
         SCE = sce.SpectralCorrelationEstimator(dft_properties)
         L_num_frames = np.ceil(1 + (N_num_samples - nw) / R_shift_samples).astype(int)
 

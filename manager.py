@@ -5,8 +5,6 @@ from pathlib import Path
 import librosa
 import numpy as np
 import scipy
-from icecream import ic
-from matplotlib import pyplot as plt
 
 import utils as u
 from utils import stft, compute_correction_term, rng, eps
@@ -126,7 +124,10 @@ class Manager:
 
         module_parent = Path(__file__).resolve().parent
         dataset_path_parent = module_parent.parent / 'datasets' / 'north_texas_vowels'
-        # dataset_path_parent = Path.cwd().parent / 'datasets' / 'north_texas_vowels'
+
+        if not dataset_path_parent.exists():
+            raise ValueError(f"Path {dataset_path_parent} does not exist. Download the dataset from the URL in the docstring.")
+
         labels_path = dataset_path_parent / 'labels.csv'
         data_path = dataset_path_parent / 'data'
 

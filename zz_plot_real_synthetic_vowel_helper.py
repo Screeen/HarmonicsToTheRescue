@@ -1,8 +1,8 @@
 import copy
 
+import manager
 import spectral_correlation_estimator as sce
 import plotter
-import manager
 import utils as u
 
 import numpy as np
@@ -131,14 +131,14 @@ class Helper:
         L_num_frames = np.ceil(1 + (N_num_samples - Nw) / R_shift_samples).astype(int)
 
         alphas_dirichlet = sce.SpectralCorrelationEstimator.get_alpha_vec_hz_dirichlet(L_num_frames, R_shift_samples_=R_shift_samples, fs_=fs)
-        m = sys_identifier_manager.Manager()
+        m = manager.Manager()
         delta_f, delta_alpha_dict = m.compute_spectral_and_cyclic_resolutions(fs, Nw, names_scf_estimators,
                                                                               alphas_dirichlet, N_num_samples)
 
         sig_prop = {'alpha_min_hz': 0, 'alpha_max_hz': alpha_max_hz, 'delta_alpha_dict': delta_alpha_dict,
                     'simulated_signal': True}
-        sig_prop_real = m.estimate_f0_generate_props_real(y_sig_samples_list[0], fs, dft_props['nfft'], R_shift_samples)
-        sig_prop.update(sig_prop_real)
+        # sig_prop_real = m.estimate_f0_generate_props_real(y_sig_samples_list[0], fs, dft_props['nfft'], R_shift_samples)
+        # sig_prop.update(sig_prop_real)
 
         if f0 is not None:
             sig_prop['f0_range'] = (f0 - 1, f0, f0 + 1)
