@@ -213,8 +213,8 @@ for variation_name in variation_names:
 
             # Synthesize noisy signal
             noise_floor = 40  # dB
-            z_in, n_in = m.add_noise_snr(s_in, desired_snr, fs, filtered=filtered_noise)  # input noise
-            x_out, n_out = m.add_noise_snr(d_out, noise_floor, fs, filtered=filtered_noise)  # output noise
+            z_in, n_in = m.add_noise_snr(s_in, desired_snr, fs, lp_filtered_noise=filtered_noise)  # input noise
+            x_out, n_out = m.add_noise_snr(d_out, noise_floor, fs, lp_filtered_noise=filtered_noise)  # output noise
 
             # u.plot([s, d, z, x], fs=fs, subplot_height=1.5,
             #    titles=['clean input s', 'clean output d', 'noisy input z', 'noisy output x'],)

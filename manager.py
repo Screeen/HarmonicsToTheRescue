@@ -61,14 +61,20 @@ class Manager:
         return y_stft
 
     @staticmethod
-    def add_noise_snr(clean, snr_db, fs=None, filtered=False):
+    def add_noise_snr(clean, snr_db, fs=None, noise=np.zeros(()), lp_filtered_noise=False):
+        # Add noise to the clean signal to achieve the desired SNR.
+        # "clean" is not modified.
+        # return noisy, noise
 
         if snr_db > 100:
             return clean, np.zeros_like(clean)
 
-        noise = rng.normal(size=len(clean))
+        if not noise.any():
+            noise = rng.normal(size=clean.shape)
+        else:
+            assert noise.shape == clean.shape, "Noise and clean signal must have the same shape."
 
-        if filtered:
+        if lp_filtered_noise:
             cutoff_freq = 1000
             b, a = scipy.signal.butter(4, cutoff_freq / (fs / 2), btype='lowpass', analog=False, output='ba')
             noise = scipy.signal.lfilter(b, a, noise)
@@ -86,8 +92,8 @@ class Manager:
         # Noise pow after rescaling, to be sure SNR is as desired
         # noise_pow = np.sum(np.abs(noise) ** 2) / len(noise)
         # snr_ = 10 * np.log10(sig_pow / noise_pow)
-        # print(f"{snr_=:.2f} dB")
-        # assert np.isclose(snr_, desired_snr_, atol=0.1)
+        # print(f"{snr_ = :.2f} dB")
+        # assert np.isclose(snr_, snr_db, atol=0.1)
 
         return noisy, noise
 
@@ -394,3 +400,44 @@ class Manager:
                                       else name for name in names_h_estimators_display]
 
         return errors_array, names_h_estimators_display
+
+    @staticmethod
+    def get_realization_directional_noise(impulse_response, wet_speech, snr_db, sample_path=None, fs=16000,
+                                          wgn_scaling=1e-6, offset_max=0.1):
+
+        if sample_path is not None:
+            dir_noise_dry, dir_noise_dry_fs = u.load_audio_file(sample_path, fs_=fs, offset_seconds=u.rng.uniform(0, offset_max),
+                                                                smoothing_window=True)
+            # Count how many repetitions are needed to make dir_noise_dry the same length as wet_speech
+            num_reps = wet_speech.shape[-1] // dir_noise_dry.shape[-1] + 1
+            dir_noise_dry = Manager.repeat_along_time_axis(dir_noise_dry, num_reps=num_reps)
+            dir_noise_dry = u.normalize_volume(dir_noise_dry)
+
+            dir_noise_dry_mix = dir_noise_dry[np.newaxis] + wgn_scaling * u.rng.normal(0, 1, dir_noise_dry.shape)
+        else:
+            dir_noise_dry_mix = u.rng.normal(0, 1, wet_speech.shape)
+
+        dir_noise_wet_mix = scipy.signal.convolve(dir_noise_dry_mix, impulse_response, mode='full')
+
+        # make dir_noise_wet_mix the same shape as wet_speech
+        dir_noise_wet_mix = Manager.pad_last_dim(dir_noise_wet_mix, wet_speech.shape[1])
+        dir_noise_wet_mix = dir_noise_wet_mix[:wet_speech.shape[0], :wet_speech.shape[1]]
+
+        _, dir_noise_wet_mix = Manager.add_noise_snr(wet_speech, snr_db=snr_db, fs=fs, noise=dir_noise_wet_mix,
+                                                     lp_filtered_noise=False)
+
+        return dir_noise_wet_mix
+
+    @staticmethod
+    def pad_last_dim(x, N_):
+        assert x.ndim <= 2, "Only 1d and 2d arrays are supported."
+        # Should work both for 1d and 2d arrays
+        if N_ > x.shape[-1]:
+            return np.pad(x, [(0, 0)] * (x.ndim - 1) + [(0, N_ - x.shape[-1])])
+        else:
+            return x
+
+    @staticmethod
+    def repeat_along_time_axis(x, num_reps=3):
+        return np.concatenate([x] * num_reps, axis=-1)
+

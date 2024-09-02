@@ -29,7 +29,7 @@ class Plotter:
 
     def __init__(self, which_plots, save_figures=False, log_transform_2d_plots=True,
                  show_figures=True, amp_range=(None, None), names_scf_estimators=None, names_h_estimators=None,
-                    indices_h_estimators=None):
+                 indices_h_estimators=None):
 
         self.mse_db_max_error = 50
         self.mse_db_min_error = -50
@@ -52,7 +52,6 @@ class Plotter:
         self.names_h_estimators = names_h_estimators
         self.indices_h_estimators = indices_h_estimators
 
-
     def update_data(self, dft_props=None, sig_props=None, sys_props=None,
                     ref_sig=np.empty(0), ref_sig_psd=np.empty(0),
                     evaluated_bins=np.empty(0)):
@@ -74,7 +73,6 @@ class Plotter:
 
         if evaluated_bins.any():
             self.evaluated_bins = evaluated_bins
-
 
     @staticmethod
     def determine_f0_range(Nw_nfft, f0):
@@ -120,7 +118,8 @@ class Plotter:
 
         psd = scipy.signal.welch(y, fs=fs, nperseg=Nw_nfft, noverlap=dft_props['noverlap'], return_onesided=True)[1]
         if peak_finding_loud_bins:
-            print(f"Use peak finding for f0={f0:.0f} Hz, {num_harmonics} harmonics, {f0_min:.0f} <= f0 <= {f0_max:.0f} Hz")
+            print(
+                f"Use peak finding for f0={f0:.0f} Hz, {num_harmonics} harmonics, {f0_min:.0f} <= f0 <= {f0_max:.0f} Hz")
 
             prominence = np.max(psd) / 200
             distance = np.ceil(0.2 * fs / Nw_nfft)
@@ -309,7 +308,8 @@ class Plotter:
         fontsize = 12
         fig, ax = plt.subplots(1, 1, figsize=(3.5, 3), constrained_layout=True)
         for jj, h_estimator_ in enumerate(names_h_estimators_):
-            ax.plot(variation_values_x, rmse[:, jj], marker=self.markers[jj], label=h_estimator_, linestyle=self.linestyles[jj])
+            ax.plot(variation_values_x, rmse[:, jj], marker=self.markers[jj], label=h_estimator_,
+                    linestyle=self.linestyles[jj])
             ax.fill_between(variation_values_x, rmse[:, jj] - rmse_95[:, jj], rmse[:, jj] + rmse_95[:, jj], alpha=0.2)
         ax.set_xlabel('SNR [dB]', fontsize=fontsize)
         ax.set_ylabel('RMSE', fontsize=fontsize)
@@ -343,13 +343,14 @@ class Plotter:
             estimator_options[h_estimator] = dict(label=h_estimator,
                                                   alpha=0.8,
                                                   color=self.colors[h_estimator_idx_],
-                                                  linestyle=self.linestyles[0] if h_estimator == 'True H' else self.linestyles[h_estimator_idx_],
+                                                  linestyle=self.linestyles[0] if h_estimator == 'True H' else
+                                                  self.linestyles[h_estimator_idx_],
                                                   # marker=self.markers[h_estimator_idx_],
                                                   # markeredgecolor=self.colors[h_estimator_idx_],
                                                   # markerfacecolor='none',
                                                   # markeredgewidth=0.5,
                                                   # markersize=3,
-            )
+                                                  )
 
         for h_estimator_idx_, estimator_opt in enumerate(estimator_options.values()):
             axes[0].plot(np.real(H_all[:, h_estimator_idx_]), **estimator_opt)
@@ -376,7 +377,6 @@ class Plotter:
         axes[2].plot(np.abs(S_ss_non_zero), label='S_ss')
         axes[2].set_title('Input PSD')
         axes[2].set_yticklabels([])
-
 
         for ax in axes:
             ax.tick_params(axis='both', which='major', labelsize=tick_fontsize)
@@ -468,7 +468,6 @@ class Plotter:
             ax.grid(True)
 
         fig.show()
-
 
     @staticmethod
     def plot_spectrogram_and_f0(x_time_domain, fs_, hop_length_, nstft, f0s=np.empty(0), what_plot='amplitude'):
@@ -577,9 +576,9 @@ class Plotter:
         return metric_name
 
     def plot_errors(self, x_values, errors_array, suptitle=None, title=None, metric_name='metric_name',
-                        algo_names='algo_name', x_label='x_label', algo_visible=None, ylim=(None, None),
-                        xscale_log=False, dpi=None, colors=None, font_size=None, legend_font_size=None,
-                        legend_num_cols=None, fig_ax_tuple=(None, None), legend_positioning='within_plot'):
+                    algo_names='algo_name', x_label='x_label', algo_visible=None, ylim=(None, None),
+                    xscale_log=False, dpi=None, colors=None, font_size=None, legend_font_size=None,
+                    legend_num_cols=None, fig_ax_tuple=(None, None), legend_positioning='within_plot'):
         """
         Plots errors_array as a function of x_values. Each subplot is a metric, each line is an algorithm.
         :param legend_positioning:
@@ -662,7 +661,7 @@ class Plotter:
                     shaded_area_fill_col = (*col[:3], 0.2)
                     shaded_area_edge_col = (*col[:3], 0.6)
                     ax.fill_between(x_values, errors_array[:, algo_idx, 1], errors_array[:, algo_idx, 2],
-                                        facecolor=shaded_area_fill_col, edgecolor=shaded_area_edge_col)
+                                    facecolor=shaded_area_fill_col, edgecolor=shaded_area_edge_col)
 
             # Plot the mean
             for algo_idx, algo_name in enumerate(algo_names):
@@ -723,8 +722,8 @@ class Plotter:
                 # x_locator = None
                 formatter = ScalarFormatter()
                 formatter.set_scientific(False)
-                ax.xaxis.set_major_formatter(formatter) # no scientific notation in x axis
-                ax.xaxis.set_minor_formatter(NullFormatter()) # no minor ticks in x axis
+                ax.xaxis.set_major_formatter(formatter)  # no scientific notation in x axis
+                ax.xaxis.set_minor_formatter(NullFormatter())  # no minor ticks in x axis
                 # x_ticks = np.log(x_values)
             else:
                 x_locator = ticker.MaxNLocator(num_x_ticks, integer=True)
@@ -781,7 +780,10 @@ class Plotter:
         if self.sig_props is None or not self.sig_props:
             raise ValueError('sig_props must be provided')
 
-        f_max_bin = self.sig_props['f_max_bin']
+        if not spectral_correlation_functions:
+            return [None], [], []
+
+        f_max_bin = self.sig_props.get('f_max_bin', None)
         simulated_signal = self.sig_props['simulated_signal']
 
         f0_title = f'{f0:.0f}' if f0 is not None else ''
@@ -822,16 +824,16 @@ class Plotter:
             if title is None:
                 title = title_2d_3d + f", {scf_name}"
 
-            f2d = u.plot_matrix(scf_plot,
-                                title=title,
-                                xy_ticks=(alphas, freqs[:f_max_bin]),
-                                xy_label=xy_label_2d, log=self.log_transform_2d_plots,
-                                show_figures=self.show_figures,
-                                amp_range=self.amp_range, figsize=figsize)
-            f2ds.append(f2d)
+            scf_fig = u.plot_matrix(scf_plot,
+                                    title=title,
+                                    xy_ticks=(alphas, freqs[:f_max_bin]),
+                                    xy_label=xy_label_2d, log=self.log_transform_2d_plots,
+                                    show_figures=self.show_figures,
+                                    amp_range=self.amp_range, figsize=figsize)
+            f2ds.append(scf_fig)
             if self.save_figures:
-                u.savefig(f2d, folder / f'scf_2d_{f0:.0f}hz_{scf_name}_{synth_or_real}.pdf')
-            plt.close(f2d)
+                u.savefig(scf_fig, folder / f'scf_2d_{f0:.0f}hz_{scf_name}_{synth_or_real}.pdf')
+            plt.close(scf_fig)
             plt.pause(0.01)
 
         return f2ds, alphas, freqs[:f_max_bin]

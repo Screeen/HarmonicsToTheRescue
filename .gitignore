@@ -2,3 +2,5 @@
 /figures_scf/
 /figures_waveform/
 /env/
+*.pdf
+*.wav

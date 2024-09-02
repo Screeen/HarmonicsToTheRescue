@@ -13,17 +13,20 @@ import os
 from matplotlib import pyplot as plt, ticker
 from scipy.ndimage import uniform_filter1d
 
-# 1413028339 looks fine
-rnd_seed = int(np.random.rand() * (2**32 - 1))
-rnd_seed = 866369434
-print(f"Random seed: {rnd_seed}")
+generate_random_seed = False
+if generate_random_seed:
+    rnd_seed = int(np.random.rand() * (2 ** 32 - 1))
+else:
+    # rnd_seed = 866369434
+    # rnd_seed = 1220931063
+    rnd_seed = 122093106313
+    print(f"Random seed: {rnd_seed}")
 rng = np.random.default_rng(rnd_seed)
 eps = np.finfo(float).eps
 cmap = 'plasma'
 
 
 def savefig(figure, file_name: Path, dpi=300, transparent=True):
-
     # If filename already exists, append a number to the end of the filename (but before extension), starting from -1
     # and increasing until a filename is found that does not exist.
     idx = 0
@@ -98,6 +101,16 @@ def compute_correction_term(stft_shape, overlap, complex_stft=False):
 #
 #     plt.show()
 #     return fig
+def pad_last_dim(x, N_, prepad=False):
+    assert x.ndim <= 2, "Only 1d and 2d arrays are supported."
+    # Should work both for 1d and 2d arrays
+    if N_ > x.shape[-1]:
+        if not prepad:
+            return np.pad(x, [(0, 0)] * (x.ndim - 1) + [(0, N_ - x.shape[-1])])
+        else:
+            return np.pad(x, [(0, N_ - x.shape[-1])] + [(0, 0)] * (x.ndim - 1))
+    else:
+        return x
 
 
 def plot(x, ax=None, titles='', fs=16000, time_axis=True, plot_config=None, subplot_height=0.8):
@@ -118,6 +131,9 @@ def plot(x, ax=None, titles='', fs=16000, time_axis=True, plot_config=None, subp
 
         # sharex flag true if all arrays in x have the same length
         sharex = all(len(x[0]) == len(item) for item in x)
+
+        max_len = max(item.shape[-1] for item in x)
+        x = [pad_last_dim(item, max_len) for item in x]
 
         fig_opt = dict(figsize=(6, 0.5 + num_plots * subplot_height), layout='compressed', squeeze=False)
         fig, axes = plt.subplots(num_plots, 1, sharey='all', sharex=sharex, **fig_opt)
@@ -186,11 +202,14 @@ def plot(x, ax=None, titles='', fs=16000, time_axis=True, plot_config=None, subp
 
 
 def plot_matrix(X_, title='', xy_label=('', ''), xy_ticks=None, log=True, show_figures=True,
-                amp_range=(None, None), figsize=None):
+                amp_range=(None, None), figsize=None, normalized=False):
+
+    if np.allclose(X_, 0):
+        warnings.warn(f"X with {title = } and {X_.shape = } is zero. Skipping plot.")
+        return None
 
     X = copy.deepcopy(X_)
-    X = np.squeeze(X)
-    X = np.atleast_2d(X)
+    X = np.atleast_2d(np.squeeze(X))
     fig, ax = plt.subplots(1, 1, constrained_layout=True, figsize=figsize)
     options = dict(cmap=cmap, antialiased=True)
 
@@ -203,11 +222,14 @@ def plot_matrix(X_, title='', xy_label=('', ''), xy_ticks=None, log=True, show_f
     font_size = 11
     title_font_size = 14
 
+    if normalized:
+        X = X / (eps + np.max(X))
+
     if log:
         if X.size == 0:
             warnings.warn("X is empty. Cannot compute log.")
             return fig
-        small_const = np.nanmin(np.abs(X)[np.abs(X) > 0]) / 2
+        small_const = np.nanmin(np.abs(X)[np.abs(X) > 0]) / 100
         X = 10 * np.log(small_const + np.abs(X) ** 2)
 
     if xy_ticks is not None:
@@ -240,6 +262,40 @@ def plot_matrix(X_, title='', xy_label=('', ''), xy_ticks=None, log=True, show_f
         plt.pause(0.05)
 
     return fig
+
+
+def fig_to_subplot(existing_fig, title, ax, xy_ticks=(None, None), xlabel='', ylabel=''):
+
+    if existing_fig is None or not existing_fig:
+        return None
+
+    # Retrieve the image data from the existing figure
+    img = existing_fig.axes[0].collections[0].get_array().data
+
+    # Retrieve vmin and vmax from the existing figure
+    vmin, vmax = existing_fig.axes[0].collections[0].get_clim()
+
+    # Retrieve the x ticks, y ticks, color map, and labels from the existing figure
+    cmap = existing_fig.axes[0].collections[0].get_cmap()
+
+    # Display the image data in the new subplot
+    if isinstance(xy_ticks, tuple) and xy_ticks[0].any() and xy_ticks[1].any():
+        im = ax.pcolormesh(*xy_ticks, img, antialiased=True, vmin=vmin, vmax=vmax, cmap=cmap)
+    else:
+        im = ax.pcolormesh(img, antialiased=True, vmin=vmin, vmax=vmax, cmap=cmap)
+
+    if xlabel == '':
+        xlabel = 'Cyclic freq.~$\\alpha_p$ [kHz]'
+
+    if ylabel == '':
+        ylabel = 'Freq.~$\\omega_k$ [kHz]'
+
+    # Set the title of the subplot
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    return im
 
 
 def generate_harmonic_signal(f0_, fs_, L_, num_harmonics_=3, frequency_error_=0.0, rnd_amplitude=False, rnd_phase=True):
@@ -300,10 +356,13 @@ def play(sound, fs=16000, max_length_seconds=5, normalize_flag=True, volume=0.75
     sound_normalized = volume * normalize_volume(sound) if normalize_flag else sound
     max_length_samples = int(max_length_seconds * fs)
     blocking = True
-    if 2 < sound_normalized.shape[0] < 10:  # multichannel input was given! Play first and last channel
-        sounddevice.play(sound_normalized[(0, -1), :max_length_samples].T, fs, blocking=blocking)
+
+    sound_normalized_pad = pad_last_dim(sound_normalized, int(1. * fs), prepad=True)
+
+    if 2 <= sound_normalized.shape[0] < 10:  # multichannel input was given! Play first and last channel
+        sounddevice.play(sound_normalized_pad[(0, -1), :max_length_samples].T, fs, blocking=blocking)
     else:
-        sounddevice.play(np.squeeze(sound_normalized)[:max_length_samples], fs, blocking=blocking)
+        sounddevice.play(np.squeeze(sound_normalized_pad)[:max_length_samples], fs, blocking=blocking)
 
 
 def normalize_volume(x_samples, max_value=0.9):
@@ -437,6 +496,7 @@ def reload(module_name):
     import importlib
     importlib.reload(module_name)
 
+
 # Clips real and imag part of complex number independently
 def clip_cpx(x, a_min, a_max):
     if np.iscomplexobj(x):
@@ -447,7 +507,6 @@ def clip_cpx(x, a_min, a_max):
 
 
 def load_audio_file(audio_file_path, fs_, N_num_samples=-1, offset_seconds=0, smoothing_window=True):
-
     if not os.path.exists(audio_file_path):
         raise ValueError(f"File {audio_file_path} does not exist.")
 
@@ -465,34 +524,36 @@ def load_audio_file(audio_file_path, fs_, N_num_samples=-1, offset_seconds=0, sm
     s = s[:N_num_samples]
 
     if smoothing_window:
-        win = scipy.signal.windows.tukey(N_num_samples, alpha=0.1)
+        win = scipy.signal.windows.tukey(N_num_samples, alpha=0.2)
         s = s * win
 
     if np.max(np.abs(s)) < 1e-3:
         raise ValueError("Signal is too small. Select a different segment.")
 
-    return s
+    return s, fs
+
 
 def generate_uniform_filtered_process(N_samples_, low=0, high=1, ma_order=10):
     x = rng.uniform(low, high, N_samples_)
     x = uniform_filter1d(x, size=ma_order)
     return x
 
+
 def generate_gaussian_filtered_process(N_samples_, mean=0., variance=1., ma_order=10):
     x = rng.normal(mean, variance, N_samples_)
     x = uniform_filter1d(x, size=ma_order)
     return x
 
-def generate_harmonic_process(freqs_hz, N_samples, fs, amplitudes_over_time=None, phases=None):
+
+def generate_harmonic_process(freqs_hz, N_samples, fs, amplitudes_over_time=None, phases=None,
+                              smooth_edges_window=False, amp_harmonic=0.5, var_harmonic=10):
     """
     Generate a sinusoid with the given frequencies and number of samples.
     The phase is a uniform random variable.
     """
 
-    def amp_generator_wss():
-        return generate_gaussian_filtered_process(N_samples, mean=0.5, variance=10, ma_order=int(fs*0.1))
-        # return generate_uniform_filtered_process(N_samples, ma_order=50)
-        # return generate_ar_filtered_process(N_samples, mean=0.1, variance=0.2, ar_order=1, ma_order=1000)
+    def amp_generator_wss(mean_, variance_):
+        return generate_gaussian_filtered_process(N_samples, mean=mean_, variance=variance_, ma_order=int(fs * 0.1))
 
     num_harmonics_ = len(freqs_hz)
     discrete_times = np.arange(N_samples) / fs
@@ -501,14 +562,15 @@ def generate_harmonic_process(freqs_hz, N_samples, fs, amplitudes_over_time=None
         phases = rng.uniform(-np.pi, np.pi, num_harmonics_)
 
     if amplitudes_over_time is None:
-        amplitudes_over_time = [amp_generator_wss() for _ in range(num_harmonics_)]
+        amplitudes_over_time = [amp_generator_wss(amp_harmonic, var_harmonic) for _ in range(num_harmonics_)]
         amplitudes_over_time = np.array(amplitudes_over_time)
 
-    if freqs_hz[0] == 0:
-        amplitudes_over_time[0] = 0  # Remove DC component
-
+    # Broadcast to shape (num_harmonics, N_samples)
     z = np.sum(amplitudes_over_time * np.cos(2 * np.pi * freqs_hz[:, None] * discrete_times[None, :] + phases[:, None]),
                axis=0)
 
-    return z
+    if smooth_edges_window:
+        win = scipy.signal.windows.tukey(N_samples, alpha=0.1)
+        z = z * win
 
+    return z

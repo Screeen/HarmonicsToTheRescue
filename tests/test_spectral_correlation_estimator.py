@@ -16,6 +16,6 @@ class TestSpectralCorrelationEstimator(unittest.TestCase):
         fs_ = 44100
         y = np.random.rand(1024)
         result = self.spectral_correlation_estimator.modulate_signal_all_alphas(L_, alpha_vec_hz, fs_, y)
-        result_vec = self.spectral_correlation_estimator.modulate_signal_all_alphas_vec(L_, alpha_vec_hz, fs_, y)
+        result_vec = self.spectral_correlation_estimator.modulate_signal_all_alphas_vec(y, alpha_vec_hz, fs_, L_)
         self.assertTrue(np.allclose(result, result_vec), "The result does not match the expected output.")
 

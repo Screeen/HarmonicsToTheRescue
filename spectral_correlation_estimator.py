@@ -1,3 +1,5 @@
+import warnings
+
 import numba
 import numpy as np
 import scipy
@@ -28,7 +30,11 @@ class SpectralCorrelationEstimator:
         self.dft_props = dft_props
 
     def run_spectral_correlation_estimators(self, names_scf_estimators, x, dft_props, alpha_max_hz, delta_alpha_dict,
-                                            alpha_min_hz=0, y=None, normalize_scf_to_1=False, coherence=False):
+                                            alpha_min_hz=0, y=None, normalize_scf_to_1=False, coherence=False,
+                                            conjugate_scf=False):
+
+        if x is None:
+            return {}
 
         fs = dft_props['fs']
         nfft = dft_props['nfft']
@@ -47,20 +53,22 @@ class SpectralCorrelationEstimator:
 
         sample_cov_dict = {'window': self.acp_window, 'fs_': fs, 'Nw_': nw, 'noverlap_samples_': noverlap_samples,
                            'complex_stft': False, 'phase_correction': True}
-        x_stft_gio = m.get_stft_phase_corrected(x, **sample_cov_dict)
-        if y is not None:
-            y_stft_gio = m.get_stft_phase_corrected(y, **sample_cov_dict)
-        else:
-            y_stft_gio = x_stft_gio
-
-        # Rescaling so that np.diag(sample_cov) == psd using scipy
-        x_stft_gio[1:-1] *= np.sqrt(2)
-        y_stft_gio[1:-1] *= np.sqrt(2)
-
-        s_sample_cov = x_stft_gio @ y_stft_gio.conj().T / x_stft_gio.shape[1]
-        cpsd_sample_cov = np.diag(s_sample_cov)
 
         if 'sample_cov' in names_scf_estimators:
+
+            x_stft_gio = m.get_stft_phase_corrected(x, **sample_cov_dict)
+            if y is not None:
+                y_stft_gio = m.get_stft_phase_corrected(y, **sample_cov_dict)
+            else:
+                y_stft_gio = x_stft_gio
+
+            # Rescaling so that np.diag(sample_cov) == psd using scipy
+            x_stft_gio[1:-1] *= np.sqrt(2)
+            y_stft_gio[1:-1] *= np.sqrt(2)
+
+            s_sample_cov = x_stft_gio @ y_stft_gio.conj().T / x_stft_gio.shape[1]
+            # cpsd_sample_cov = np.diag(s_sample_cov)
+
             freqs_sample_cov = np.fft.rfftfreq(nfft, 1 / fs)
             res['sample_cov']['freqs'] = freqs_sample_cov
             res['sample_cov']['alphas'] = freqs_sample_cov
@@ -81,7 +89,7 @@ class SpectralCorrelationEstimator:
                                                          noverlap_samples_=noverlap_samples,
                                                          alpha_min_hz=alpha_min_hz,
                                                          alpha_max_hz=alpha_max_hz,
-                                                         conjugate_scf=False,
+                                                         conjugate_scf=conjugate_scf,
                                                          window=self.acp_window,
                                                          delta_alpha=delta_alpha_dict['acp'],
                                                          compute_coherence=coherence))
@@ -109,14 +117,19 @@ class SpectralCorrelationEstimator:
 
         # Use the same PSD for all estimators, so that we can compare them more easily.
         for key in res.keys():
-            res[key]['psd'] = cpsd_sample_cov
+            # res[key]['psd'] = cpsd_sample_cov
+            res[key]['psd'] = scipy.signal.csd(y, x, fs=fs,
+                                           nperseg=nw,
+                                           nfft=nfft,
+                                           noverlap=noverlap_samples,
+                                           return_onesided=True, scaling='spectrum', detrend=False)[1]
             # if key != 'sample_cov' and key != 'psd':
             #     res[key]['scf'][:, 0] = cpsd_sample_cov
 
         return res
 
     @staticmethod
-    def compute_averaged_cyclic_periodogram(x, y=None, fs_=16000, Nw=512, noverlap_samples_=0, window=None,
+    def compute_averaged_cyclic_periodogram(x, y, fs_=16000, Nw=512, noverlap_samples_=0, window=None,
                                             alpha_min_hz=0.0, alpha_max_hz=500., delta_alpha=None,
                                             conjugate_scf=False, nfft=None, compute_coherence=False):
         """
@@ -132,6 +145,12 @@ class SpectralCorrelationEstimator:
         where S_x(f) is the PSD of x(t) and S_y(f - alpha) is the PSD of y(t) modulated by exp(j 2 pi alpha t)
         """
 
+        if x.ndim == 1 and y.ndim == 1:
+            x = x[np.newaxis]
+            y = y[np.newaxis]
+        elif x.ndim != y.ndim:
+            raise ValueError(f'{x.ndim=} and {y.ndim=} must be equal')
+
         if nfft is None:
             nfft = Nw
 
@@ -140,49 +159,58 @@ class SpectralCorrelationEstimator:
                                          detrend=False, return_onesided=False, boundary=None, padded=False, axis=-1)
             return Y_
 
-        N_num_samples = len(x)
+        N_num_samples = x.shape[-1]
         nfft_real = nfft // 2 + 1
         # R_shift_samples = Nw - noverlap_samples_
         # L_num_frames = np.floor((N_num_samples - Nw + R_shift_samples) / R_shift_samples).astype(int)
         squared_coherence = None
 
+        # A single realization of x is provided: don't cheat with resolution of alpha
         delta_alpha_min = fs_ / N_num_samples  # minimum possible delta_alpha
         if delta_alpha is not None:  # provided by user
             if delta_alpha < delta_alpha_min:
-                raise ValueError(f'delta_alpha={delta_alpha} is too small. Cannot be smaller than {delta_alpha_min}')
+                warnings.warn(f'delta_alpha={delta_alpha} is too small. Cannot be smaller than {delta_alpha_min}')
         else:
             delta_alpha = delta_alpha_min
 
         # Compute vector of cyclic frequencies of interest (in Hz)
         alpha_vec_hz = np.arange(alpha_min_hz, alpha_max_hz, delta_alpha)
-        if len(alpha_vec_hz) < 2:
+        num_alphas = len(alpha_vec_hz)
+        if num_alphas < 2:
             raise ValueError(f'{alpha_max_hz=} is too small. {delta_alpha=}')
 
         # Compute vector of frequencies of interest (in Hz)
         f_vec_hz = np.fft.fftfreq(nfft, d=1 / fs_)
         f_vec_hz_real = np.abs(f_vec_hz[:nfft_real])
+        # f_vec_hz_real = np.roll(f_vec_hz, nfft // 2)
 
-        y_alpha_time = SpectralCorrelationEstimator.modulate_signal_all_alphas_vec(N_num_samples, alpha_vec_hz, fs_, y)
-        y_alpha_stft = local_stft(y_alpha_time)
+        # Modulation signal has shape (num_alphas, N_num_samples)
+        # y has shape (num_realizations, N_num_samples)
+        modulation_signal = SpectralCorrelationEstimator.modulate_signal_all_alphas_vec(
+                                                            np.ones(N_num_samples), alpha_vec_hz, fs_, N_num_samples)
+        y_alpha_time = modulation_signal[np.newaxis, :, :] * y[:, np.newaxis, :]
 
         # Corresponds to X(f-alpha) for alpha=0 -> X(f)
         # Rescale so that np.diag(sample_cov) == psd using scipy
         x_stft = local_stft(x)
-        x_stft[1:-1] *= np.sqrt(2)
-        y_alpha_stft[:, 1:-1] *= np.sqrt(2)
+        x_stft = x_stft[:, np.newaxis]  # broadcast to shape of y_alpha_stft: (num_realizations, num_alphas, nfft_real, L_num_frames)
+        y_alpha_stft = local_stft(y_alpha_time)
+
+        x_stft[:, :, 1:-1, :] *= np.sqrt(2)
+        y_alpha_stft[:, :, 1:-1] *= np.sqrt(2)
 
         # Discard values that correspond to negative spectral frequencies, ff_hz < 0
-        x_stft = x_stft[:nfft_real]
-        y_alpha_stft = y_alpha_stft[:, :nfft_real]
+        # x_stft = x_stft[:, :, :nfft_real]
+        # y_alpha_stft = y_alpha_stft[:, :, :nfft_real]
 
-        # Compute time-smoothed averaged periodogram (cyclic correlation)
         if not conjugate_scf:
-            cyclic_correlation = np.mean(x_stft[np.newaxis] * y_alpha_stft.conj(), axis=-1).T
+            cyclic_correlation = np.mean(x_stft * y_alpha_stft.conj(), axis=(0, -1)).T
         else:
-            cyclic_correlation = np.mean(x_stft[np.newaxis] * y_alpha_stft, axis=-1).T
+            cyclic_correlation = np.mean(x_stft * y_alpha_stft, axis=(0, -1)).T
 
         if compute_coherence:
-            if conjugate_scf: raise NotImplementedError("coherence and conjugate_scf are not implemented together")
+            if conjugate_scf:
+                raise NotImplementedError("coherence and conjugate_scf are not implemented together")
 
             x_psd = np.mean(np.square(np.abs(x_stft)), axis=-1)
             y_alpha_psd = np.mean(np.square(np.abs(y_alpha_stft)), axis=-1)
@@ -190,7 +218,7 @@ class SpectralCorrelationEstimator:
             squared_coherence = np.abs(cyclic_correlation) ** 2 / normalizations.T
 
         # Set to 0 values that correspond to negative frequencies in SCF: (ff_hz - aa_hz) < 0
-        # Leaving this untouched is like having Hermitian symmetry in the sample estimate of the SCF,
+        # Leaving this commented out is like having Hermitian symmetry in the sample estimate of the SCF,
         # and it can be convenient for system identification.
         # for idx_ff, ff_hz in enumerate(f_vec_hz_real):
         #     for idx_aa, aa_hz in enumerate(alpha_vec_hz):
@@ -214,10 +242,28 @@ class SpectralCorrelationEstimator:
 
     @staticmethod
     @numba.jit(cache=True, nopython=True, parallel=True)
-    def modulate_signal_all_alphas_vec(L_: int, alpha_vec_hz: np.ndarray, fs_: float, y: np.ndarray) -> np.ndarray:
-        time_axis = 2j * np.pi * np.arange(L_) / fs_
+    def modulate_signal_all_alphas_vec(y: np.ndarray, alpha_vec_hz: np.ndarray, fs_: float, N_num_samples: int) -> np.ndarray:
+        time_axis = 2j * np.pi * np.arange(N_num_samples) / fs_
         alpha_matrix = np.exp(np.outer(alpha_vec_hz, time_axis))
-        y_alpha_time = y * alpha_matrix
+        return y * alpha_matrix
+
+    @staticmethod
+    # @numba.jit(cache=True, nopython=True)
+    def modulate_signal_all_alphas_vec_2d(y: np.ndarray, alpha_vec_hz: np.ndarray, fs_: float) -> np.ndarray:
+        # Shifts the signal y to higher frequencies contained in alpha_vec_hz
+
+        # y is 2d: (num_realizations, N_num_samples)
+        # alpha_vec_hz is 1d: (num_alphas,)
+        N_num_samples = y.shape[-1]
+        exponent_without_alpha = 2j * np.pi * np.arange(N_num_samples) / fs_  # size: (N_num_samples,)
+        alpha_matrix = np.exp(np.outer(alpha_vec_hz, exponent_without_alpha))  # size: (num_alphas, N_num_samples)
+
+        # DEBUG
+        # alpha_matrix = alpha_matrix.real
+
+        # Add "alphas" dimension to y and "num_realizations" dimension to alpha_matrix to get shape to get shape
+        # (num_realizations, num_alphas, N_num_samples)
+        y_alpha_time = y[:, np.newaxis] * alpha_matrix[np.newaxis, ...]
         return y_alpha_time
 
     @staticmethod
