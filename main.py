@@ -3,15 +3,12 @@ from pathlib import Path
 
 import numpy as np
 from matplotlib import pyplot as plt
-from tqdm import trange
-from tqdm.contrib import tenumerate
 
 import plotter
 import spectral_correlation_estimator as sce
 import manager as si_manager
 import system_identifier as si
 import utils as u
-
 
 u.set_printoptions_numpy()
 u.set_plot_options(use_tex=True)
@@ -24,17 +21,17 @@ alpha_min_hz = 0
 plot_area_size = 3
 plt_config = {'font_size': 'medium',
               'xscale_log': False,
-              'legend_num_cols': 1, 'legend_font_size': 'large',
+              'legend_num_cols': 1,
+              'legend_font_size': 'medium',
               # 'ylim': (0.0, 0.35),
               'ylim': (0.0, 1.0),
               'title': '',
               'metric_name': 'RMSE'}
 
-
 fs = 16000
 # variation_name = 'nfft'
-variation_names = ['nfft', 'snr']
-# variation_names = ['snr']
+# variation_names = ['nfft', 'snr']
+variation_names = ['snr']
 # variation_names = ['nfft']
 
 # N_num_samples_sim = int(0.25 * fs)
@@ -62,7 +59,7 @@ nfft_default = 256
 snr_db_default = 0
 N_num_samples_default = int(0.25 * fs)
 
-num_montecarlo = 1
+num_montecarlo = 10
 
 compute_coherence = True
 filtered_noise = False
@@ -103,10 +100,10 @@ indices_h_estimators = [names_h_estimators.index(name) for name in names_h_estim
 # R_shift_samples = np.ceil(fs / (2 * alpha_max_hz)).astype(int)
 # L_num_frames = np.ceil(1 + np.floor((N_num_samples - Nw_nfft) / R_shift_samples)).astype(int)
 
-plter = plotter.Plotter(which_plots=which_plots, save_figures=save_figures,
-                          show_figures=show_figures, amp_range=amp_range_plot,
-                          names_scf_estimators=names_scf_estimators, names_h_estimators=names_h_estimators,
-                          indices_h_estimators=indices_h_estimators)
+plotter_obj = plotter.Plotter(which_plots=which_plots, save_figures=save_figures,
+                              show_figures=show_figures, amp_range=amp_range_plot,
+                              names_scf_estimators=names_scf_estimators, names_h_estimators=names_h_estimators,
+                              indices_h_estimators=indices_h_estimators)
 
 results_list = []
 for variation_name in variation_names:
@@ -121,7 +118,7 @@ for variation_name in variation_names:
     rmse_conf_int = np.zeros((num_variations, num_h_estimators, num_scf_estimators))
     # errors_array = np.zeros((num_variations, num_h_estimators, num_scf_estimators, 3))
 
-    for variation_idx, variation_parameter in tenumerate(variations_list):
+    for variation_idx, variation_parameter in enumerate(variations_list):
 
         desired_snr = variation_parameter if variation_name == 'snr' else snr_db_default
         f0_sim = variation_parameter if variation_name == 'f0' else None
@@ -154,19 +151,19 @@ for variation_name in variation_names:
                                                                               alphas_dirichlet, N_num_samples)
 
         sig_prop = {
-                    # 'num_harmonics': num_harmonics,
-                    'f_max_hz': f_max_hz,
-                    'f_max_bin': int(np.ceil(f_max_hz / delta_f)),
-                    'simulated_signal': simulated_signal, 'alpha_min_hz': alpha_min_hz,
-                    'N_num_samples': N_num_samples, 'alpha_max_hz': alpha_max_hz, 'delta_alpha_dict': delta_alpha_dict,
-                    'delta_f': delta_f, 'snr': desired_snr}
+            # 'num_harmonics': num_harmonics,
+            'f_max_hz': f_max_hz,
+            'f_max_bin': int(np.ceil(f_max_hz / delta_f)),
+            'simulated_signal': simulated_signal, 'alpha_min_hz': alpha_min_hz,
+            'N_num_samples': N_num_samples, 'alpha_max_hz': alpha_max_hz, 'delta_alpha_dict': delta_alpha_dict,
+            'delta_f': delta_f, 'snr': desired_snr}
 
         sce_dict = {'names_scf_estimators': names_scf_estimators, 'dft_props': dft_properties,
                     'alpha_min_hz': sig_prop['alpha_min_hz'], 'alpha_max_hz': sig_prop['alpha_max_hz'],
                     'delta_alpha_dict': sig_prop['delta_alpha_dict'], 'normalize_scf_to_1': False,
                     'coherence': compute_coherence, }
 
-        for ii in trange(num_montecarlo):
+        for ii in range(num_montecarlo):
 
             # h(n) is a random filter with exponentially decaying envelope.
             h = m.generate_impulse_response(num_samples_h=num_samples_h)
@@ -184,10 +181,12 @@ for variation_name in variation_names:
                 s_in = m.generate_simulated_signal(sig_prop, fs=dft_properties['fs'])
 
             else:
-                s_in = m.load_vowel_recording(N_num_samples, fs, offset_=offset_load_real, selected_people=selected_people)
+                s_in = m.load_vowel_recording(N_num_samples, fs, offset_=offset_load_real,
+                                              selected_people=selected_people)
                 s_in = m.remove_mean_normalize(s_in)
 
-                sig_prop['f0_range'], sig_prop['f0_over_time'] = m.find_f0_from_recording(s_in, fs, R_shift_samples, nfft)
+                sig_prop['f0_range'], sig_prop['f0_over_time'] = m.find_f0_from_recording(s_in, fs, R_shift_samples,
+                                                                                          nfft)
                 if 0 in sig_prop['f0_range']:
                     continue
 
@@ -233,12 +232,12 @@ for variation_name in variation_names:
             # Plot time, PSD, SCF, and estimated transfer function
             if ii == 0:
                 system_properties = {'h': h, 'H': H, 'H_hat': H_hat}
-                plter.update_data(dft_props=dft_properties, sig_props=sig_prop, sys_props=system_properties,
-                                  ref_sig=d_out, ref_sig_psd=d_psd, evaluated_bins=evaluated_bins)
+                plotter_obj.update_data(dft_props=dft_properties, sig_props=sig_prop, sys_props=system_properties,
+                                        ref_sig=d_out, ref_sig_psd=d_psd, evaluated_bins=evaluated_bins)
 
                 _, s_psd = m.choose_evaluated_bins(s_in, dft_properties, spectral_bins_harmonics)
-                plter.update_data(ref_sig=s_in, ref_sig_psd=s_psd)
-                plter.plot_all(spectral_correlation_functions=scf_xz, f0=sig_prop['f0_range'][1])
+                plotter_obj.update_data(ref_sig=s_in, ref_sig_psd=s_psd)
+                plotter_obj.plot_all(spectral_correlation_functions=scf_xz, f0=sig_prop['f0_range'][1])
 
             # Calculate Root Mean Squared Error (RMSE) for each realization
             for h_est_idx in indices_h_estimators:
@@ -275,19 +274,21 @@ for variation_name in variation_names:
             names_h_estimators_display_new.append('Gardner')
 
     results_dict = {'errors_array': errors_array, 'x_values': variations_list_display,
-                   'algo_names': names_h_estimators_display_new, 'x_label': variation_name.upper()}
+                    'algo_names': names_h_estimators_display_new, 'x_label': variation_name.upper()}
     results_list.append(results_dict)
 
 # Plot results for each variation_name
 num_plots = len(variation_names)
-height = 2.0 if not simulated_signal else 1.78
+height = 1.78
+# height = 2.0 if not simulated_signal else 1.78
 fig, axes = plt.subplots(ncols=num_plots, figsize=(1 + num_plots * plot_area_size, height), layout='compressed',
                          sharey=True, squeeze=False)
 for idx, (ax, results_dict) in enumerate(zip(axes.flat, results_list)):
-    pos = 'none'
-    if idx == len(results_list) - 1 and simulated_signal:
-        pos = 'outside_plot'
-    plter.plot_errors(fig_ax_tuple=(fig, ax), legend_positioning=pos, **results_dict, **plt_config)
+    pos = 'best' if simulated_signal else 'none'
+    # pos = 'none'  # alternatives: 'outside_plot', 'none', 'best'
+    # if idx == len(results_list) - 1 and simulated_signal:
+    #     pos = 'outside_plot'
+    plotter_obj.plot_errors(fig_ax_tuple=(fig, ax), legend_positioning=pos, **results_dict, **plt_config)
 
 suptitle = 'Simulated data' if simulated_signal else 'Real data'
 if simulated_signal:
@@ -296,5 +297,5 @@ else:
     fig.suptitle(suptitle, fontsize='xx-large')
 fig.show()
 u.check_create_folder('figures_errors')
-u.savefig(fig, Path('figures_errors') / f'errors_{"_".join(suptitle.lower().split(" "))}.pdf')
-
+u.savefig(fig, Path('figures_errors') / f'errors_{"_".join(suptitle.lower().split(" "))}.pdf',
+          transparent=True)

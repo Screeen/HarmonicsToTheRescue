@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import manager
 import utils as u
 import zz_plot_real_synthetic_vowel_helper as helper
+import pickle
+import spectral_correlation_estimator as sce
 
 u.set_plot_options(use_tex=True)
 u.set_printoptions_numpy()
@@ -27,7 +29,9 @@ y_ticks_labels = []
 
 show_single_scf_plots = False
 show_combined_scf_plots = True
-show_combined_time_domain_plots = True
+show_combined_time_domain_plots = False
+
+try_loading_data = False
 
 compute_real_data = True
 compute_avg_random_phase_data = True
@@ -45,7 +49,7 @@ L = int(np.ceil(N / Nw))  # number of frames computed as total_length_samples / 
 N = L * Nw  # adjust N to be a multiple of Nw
 R_shift_samples = Nw // 3
 snr = np.inf
-num_realizations = 5
+num_realizations = 100
 amplitude_single_harmonic = 0.5  # mean of the Gaussian process which modulates the amplitude of the harmonic
 print(f"{N = }, {L = }, {R_shift_samples = }, signal duration: {N / fs:.2f}s")
 
@@ -73,7 +77,7 @@ assert num_harmonics > 0
 dft_props = {'nfft': Nw, 'noverlap': Nw - R_shift_samples, 'window': 'hann', 'nw': Nw, 'fs': fs}
 scf_cfg = {'dft_props': dft_props, 'num_harmonics': num_harmonics, 'alpha_max_hz': f_cutoff + f0 // 2,
            'conjugate_scf': False}
-plot_cfg = {'amp_range': (-80, 0), 'figsize': (7, 3.5), 'show_figures': show_single_scf_plots}
+plot_cfg = {'amp_range': (-80, 0), 'figsize': (8, 3.5), 'show_figures': show_single_scf_plots}
 h = helper.Helper()
 
 if scf_cfg['conjugate_scf']:
@@ -139,17 +143,26 @@ titles = ['Voiced speech' if compute_real_data else None,
 # SCF plots
 if show_combined_scf_plots:
 
-    import spectral_correlation_estimator as sce
     SCE = sce.SpectralCorrelationEstimator(dft_props=dft_props)
-    sce_props, sig_props = helper.Helper.prepare_parameters_cyclic_spectrum_estimation(N_num_samples_=N, f0=f0, **scf_cfg)
+    sce_props, sig_props = helper.Helper.prepare_parameters_cyclic_spectrum_estimation(N_num_samples_=N, f0=f0,
+                                                                                       **scf_cfg)
 
-    print(f"Estimating SCFs for {len(sample_paths_list)} signals.")
-    # Calculate the spectral correlation functions
-    estimated_scfs_and_freqs_list = []
-    for yy, title in zip(sample_paths_list, titles):
-        print(f"Computing SCF for {title}.")
-        cyc_spectrum_dict_single_realization = SCE.run_spectral_correlation_estimators(x=yy, **sce_props)
-        estimated_scfs_and_freqs_list.append(cyc_spectrum_dict_single_realization)
+    if try_loading_data and Path('estimated_scfs_and_freqs_list.pkl').exists():
+        with open('estimated_scfs_and_freqs_list.pkl', 'rb') as f:
+            estimated_scfs_and_freqs_list = pickle.load(f)
+    else:
+        print(f"Estimating SCFs for {len(sample_paths_list)} signals.")
+        # Calculate the spectral correlation functions
+        estimated_scfs_and_freqs_list = []
+        for yy, title in zip(sample_paths_list, titles):
+            print(f"Computing SCF for {title}.")
+            cyc_spectrum_dict_single_realization = SCE.run_spectral_correlation_estimators(x=yy, **sce_props)
+            estimated_scfs_and_freqs_list.append(cyc_spectrum_dict_single_realization)
+
+        # save estimated_scfs_and_freqs_list using pickle
+        with open('estimated_scfs_and_freqs_list.pkl', 'wb') as f:
+            import pickle
+            pickle.dump(estimated_scfs_and_freqs_list, f)
 
     # Plot the SCFs
     print(f"Plotting SCFs.")
@@ -159,7 +172,7 @@ if show_combined_scf_plots:
         existing_figs.extend(fig_zz)
 
     # Combine the SCFs plots into a single figure
-    fig = plt.figure(figsize=(6, 4.5), layout='compressed')
+    fig = plt.figure(figsize=(5, 6), layout='compressed')
 
     # Loop over the list of existing figures
     # The new figure will have 3 rows and 2 columns. The first row will contain the real signal and an empty spot,
@@ -182,10 +195,11 @@ if show_combined_scf_plots:
         ax.label_outer()
 
     fig.show()
-    u.check_create_folder(folder_name='figures_scf', parent_folder=Path.cwd())
-    u.savefig(figure=fig, file_name=PosixPath('figures_scf') / '2d_scfs_real_vs_rnd_amp_vs_rnd_phase.pdf')
+    u.check_create_folder(folder_name='figs', parent_folder=Path.cwd())
+    u.savefig(figure=fig, file_name=PosixPath('figs') / '2d_scfs_real_vs_rnd_amp_vs_rnd_phase.pdf',
+              transparent=True)
 
-# Time-domain plots
+# Time-domain plots (waveforms)
 if show_combined_time_domain_plots:
     y_rnd_amplitude = y_rnd_amplitude_list_temp[0]
     y_rnd_phase = y_rnd_phase_list_temp[0]
@@ -202,12 +216,15 @@ if show_combined_time_domain_plots:
     for ax in axes:
         ax.set_ylim(-1, 1)
 
+    fig.set_size_inches(3.8, 4.5)
+
     # On the second ax (random phase), insert a vertical red line every 2048 samples
     for i in range(0, len(y_rnd_phase), Nw):
         axes[1].axvline(i, color='r', linestyle='--', linewidth=1)
     fig.show()
-    u.check_create_folder(folder_name='figures_waveform', parent_folder=Path.cwd())
-    u.savefig(figure=fig, file_name=Path('figures_waveform') / 'rnd_amplitude_vs_rnd_phase_vs_real.pdf')
+    u.check_create_folder(folder_name='figs', parent_folder=Path.cwd())
+    u.savefig(figure=fig, file_name=Path('figs') / 'rnd_amplitude_vs_rnd_phase_vs_real.pdf',
+              transparent=True)
 
     # u.play(np.concatenate((np.zeros(int(fs * 0.5)), y_rnd_amplitude, np.zeros(int(fs * 0.5)))), fs=fs, volume=0.4)
     # u.play(np.concatenate((np.zeros(int(fs * 0.5)), y_rnd_phase, np.zeros(int(fs * 0.5)))), fs=fs, volume=0.4)
