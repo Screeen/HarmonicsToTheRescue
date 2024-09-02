@@ -36,9 +36,15 @@ def savefig(figure, file_name: Path, dpi=300, transparent=True):
         idx += 1
         file_name = file_name.with_name(file_name_stem + f"_{idx}" + file_name.suffix)
 
-    figure.savefig(file_name, dpi=dpi, transparent=transparent,
-                   bbox_inches='tight',
-                   facecolor=figure.get_facecolor(), edgecolor=figure.get_edgecolor())
+    # facecolor parameter determines the background color of the saved figure
+    # edgecolor parameter determines the color of the border of the saved figure
+    # transparent=True makes the background transparent
+    sett = {'dpi': dpi, 'transparent': transparent, 'bbox_inches': 'tight'}
+    if not transparent:
+        sett['facecolor'] = figure.get_facecolor()
+        sett['edgecolor'] = figure.get_edgecolor()
+
+    figure.savefig(file_name, **sett)
 
     print(f"Figure saved as {file_name}")
 

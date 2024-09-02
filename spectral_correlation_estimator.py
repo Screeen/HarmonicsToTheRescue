@@ -215,7 +215,8 @@ class SpectralCorrelationEstimator:
             x_psd = np.mean(np.square(np.abs(x_stft)), axis=-1)
             y_alpha_psd = np.mean(np.square(np.abs(y_alpha_stft)), axis=-1)
             normalizations = x_psd[np.newaxis] * y_alpha_psd
-            squared_coherence = np.abs(cyclic_correlation) ** 2 / normalizations.T
+            squared_coherence = (np.abs(cyclic_correlation) ** 2) / normalizations.swapaxes(-1, -2)
+            squared_coherence = np.squeeze(squared_coherence)
 
         # Set to 0 values that correspond to negative frequencies in SCF: (ff_hz - aa_hz) < 0
         # Leaving this commented out is like having Hermitian symmetry in the sample estimate of the SCF,

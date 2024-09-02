@@ -750,18 +750,15 @@ class Plotter:
             # num_cols = int(np.ceil(len(algo_names) / 3)) # legend has at most 3 entries per each column.
             # legend_num_cols = 2 if len(algo_names) > 2 else 1
             handles, labels = ax.get_legend_handles_labels()
-            if legend_positioning == 'within_plot':
-                ax.legend(handles, labels, fontsize=legend_font_size, ncol=legend_num_cols)
-            elif legend_positioning == 'outside_plot':
+            if legend_positioning == 'outside_plot':
                 # https://stackoverflow.com/questions/4700614/how-to-put-the-legend-outside-the-plot/43439132#43439132
                 ax.legend(handles, labels, loc='lower left', fontsize='large',
                           bbox_to_anchor=(0., 1.01),
-                          mode="expand", borderaxespad=0, ncol=2, frameon=False)
-            else:
+                          mode="expand", borderaxespad=0, ncol=legend_num_cols, frameon=False)
+            elif legend_positioning == 'none':
                 pass
-                # if ax.get_legend():
-                #     ax.get_legend().remove()
-                #     ax.legend().set_visible(False)
+            else:
+                ax.legend(handles, labels, fontsize=legend_font_size, ncol=legend_num_cols)
 
         if suptitle is not None:
             fig.suptitle(suptitle, fontsize=font_size)

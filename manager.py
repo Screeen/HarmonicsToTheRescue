@@ -162,7 +162,7 @@ class Manager:
             file_path = data_path / random_file_name()
             counter += 1
 
-        s = u.load_audio_file(file_path, fs_, N_num_samples, offset_, smoothing_window)
+        s, fs__ = u.load_audio_file(file_path, fs_, N_num_samples, offset_, smoothing_window)
 
         return s
 
