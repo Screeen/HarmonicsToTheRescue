@@ -1,21 +1,26 @@
 # Harmonics to the rescue: why voiced speech is not a WSS process
-
 ## Introduction
-This repository contains the code for the paper "Harmonics to the rescue: why voiced speech is not a WSS process", to be submitted to IWAENC 2024. 
-The code is written in Python and uses the following libraries: numpy, scipy, matplotlib. 
+This code accompanies the paper *"Harmonics to the rescue: why voiced speech is not a WSS process"*.
+The paper was accepted for the 18th International Workshop on Acoustic Signal Enhancement (**IWAENC 2024**). 
+The code is written in Python. 
+
+<p align="center">
+  <img src="./pics/waveforms.svg" />
+</p>
 
 ## Installation
-To install the required libraries, run the following command:
+To install the required libraries, run
 ```
 pip install -r requirements.txt
 ```
 
 ## Usage
-To generate the plots, run the following command:
+To run the experiments, run
 ```
 python main.py
 ```
-and
+
+The figures are generated with
 ```
 python zz_plot_real_synthetic_vowel.py
 ```
