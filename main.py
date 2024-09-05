@@ -51,7 +51,7 @@ nfft_config = [128, 256, 512, 1024, 2048]
 # desired_snrs_config = [30]
 configs_dict = {'snr': desired_snrs_config, 'duration': D_length_seconds_config, 'f0': f0_config, 'nfft': nfft_config}
 
-simulated_signal = True
+simulated_signal = False
 round_f0_sim_delta_f = False
 round_f0_sim_delta_alpha = False
 
@@ -59,7 +59,7 @@ nfft_default = 256
 snr_db_default = 0
 N_num_samples_default = int(0.25 * fs)
 
-num_montecarlo = 10
+num_montecarlo = 40
 
 compute_coherence = True
 filtered_noise = False
@@ -292,9 +292,11 @@ for idx, (ax, results_dict) in enumerate(zip(axes.flat, results_list)):
 
 suptitle = 'Simulated data' if simulated_signal else 'Real data'
 if simulated_signal:
-    fig.suptitle(suptitle, fontsize='xx-large', y=1.23)
+    fig.suptitle(suptitle, fontsize='x-large')
+    # fig.suptitle(suptitle, fontsize='xx-large', y=1.23)
 else:
-    fig.suptitle(suptitle, fontsize='xx-large')
+    fig.suptitle(suptitle, fontsize='x-large')
+    # fig.suptitle(suptitle, fontsize='xx-large')
 fig.show()
 u.check_create_folder('figures_errors')
 u.savefig(fig, Path('figures_errors') / f'errors_{"_".join(suptitle.lower().split(" "))}.pdf',

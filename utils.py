@@ -19,7 +19,8 @@ if generate_random_seed:
 else:
     # rnd_seed = 866369434
     # rnd_seed = 1220931063
-    rnd_seed = 122093106313
+    # rnd_seed = 122093106313
+    rnd_seed = 122093106313 + 1
     print(f"Random seed: {rnd_seed}")
 rng = np.random.default_rng(rnd_seed)
 eps = np.finfo(float).eps
