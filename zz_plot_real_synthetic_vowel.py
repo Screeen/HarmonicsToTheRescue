@@ -28,8 +28,8 @@ x_ticks_labels = []
 y_ticks_labels = []
 
 show_single_scf_plots = False
-show_combined_scf_plots = True
-show_combined_time_domain_plots = False
+show_combined_scf_plots = False
+show_combined_time_domain_plots = True
 
 try_loading_data = False
 
@@ -49,7 +49,7 @@ L = int(np.ceil(N / Nw))  # number of frames computed as total_length_samples / 
 N = L * Nw  # adjust N to be a multiple of Nw
 R_shift_samples = Nw // 3
 snr = np.inf
-num_realizations = 100
+num_realizations = 1
 amplitude_single_harmonic = 0.5  # mean of the Gaussian process which modulates the amplitude of the harmonic
 print(f"{N = }, {L = }, {R_shift_samples = }, signal duration: {N / fs:.2f}s")
 
@@ -223,7 +223,7 @@ if show_combined_time_domain_plots:
         axes[1].axvline(i, color='r', linestyle='--', linewidth=1)
     fig.show()
     u.check_create_folder(folder_name='figs', parent_folder=Path.cwd())
-    u.savefig(figure=fig, file_name=Path('figs') / 'rnd_amplitude_vs_rnd_phase_vs_real.pdf',
+    u.savefig(figure=fig, file_name=Path('figs') / 'rnd_amplitude_vs_rnd_phase_vs_real.svg',
               transparent=True)
 
     # u.play(np.concatenate((np.zeros(int(fs * 0.5)), y_rnd_amplitude, np.zeros(int(fs * 0.5)))), fs=fs, volume=0.4)
