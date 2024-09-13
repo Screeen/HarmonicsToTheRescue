@@ -286,7 +286,7 @@ def fig_to_subplot(existing_fig, title, ax, xy_ticks=(None, None), xlabel='', yl
     cmap = existing_fig.axes[0].collections[0].get_cmap()
 
     # Display the image data in the new subplot
-    if isinstance(xy_ticks, tuple) and xy_ticks[0].any() and xy_ticks[1].any():
+    if isinstance(xy_ticks, tuple) and len(xy_ticks[0]) > 1:
         im = ax.pcolormesh(*xy_ticks, img, antialiased=True, vmin=vmin, vmax=vmax, cmap=cmap)
     else:
         im = ax.pcolormesh(img, antialiased=True, vmin=vmin, vmax=vmax, cmap=cmap)
